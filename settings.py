@@ -29,3 +29,5 @@ ENEMY_SPEED_SCALE = 0.05
 
 # SISTEMA DE JUEGO
 PLAYER_MAX_LIVES = 3
+COLOR_HEART_FULL  = (220, 50,  80)   # Rojo para corazón lleno
+COLOR_HEART_EMPTY = (80,  30,  40)   # Rojo oscuro para corazón vacío

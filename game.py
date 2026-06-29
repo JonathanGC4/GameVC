@@ -2,11 +2,14 @@
 # game.py — Iteración 3: colisiones completas con feedback visual
 # =============================================================================
 
+
 import pygame
+from utils import draw_text, draw_hearts
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, TARGET_FPS,
     COLOR_BACKGROUND, COLOR_ACCENT,
     ENEMY_BASE_SPEED, ENEMY_SPAWN_RATE,
+    PLAYER_MAX_LIVES, 
 )
 from player import Player
 from enemy  import Enemy
@@ -147,6 +150,14 @@ class Game:
         self.screen.blit(flash, (0, 0))
 
     def _draw_hud(self):
+        """
+        HUD completo — Iteración 4:
+          - Puntuación y tiempo (izquierda)
+          - Corazones de vida (centro superior)
+          - Contador de enemigos (derecha)
+          - Barra de ayuda (parte inferior)
+        """
+        # --- Columna izquierda ---
         draw_text(self.screen, f"Puntos: {self.score}", 28,
                   x=16, y=12, anchor="topleft")
 
@@ -155,13 +166,29 @@ class Game:
         draw_text(self.screen, f"Tiempo: {mins:02d}:{secs:02d}", 28,
                   x=16, y=42, anchor="topleft")
 
-        draw_text(self.screen, f"Vidas: {self.player.lives}", 28,
-                  x=SCREEN_WIDTH - 16, y=12, anchor="topright")
+        # --- Centro superior: corazones ---
+        # Calculamos el ancho total para centrarlos en la pantalla
+        heart_size = 16
+        heart_gap  = 8
+        total_width = PLAYER_MAX_LIVES * (heart_size * 2 + heart_gap) - heart_gap
+        hearts_x = (SCREEN_WIDTH - total_width) // 2
 
-        draw_text(self.screen, f"Enemigos: {len(self.enemies)}", 22,
-                  x=SCREEN_WIDTH - 16, y=44, anchor="topright",
+        draw_hearts(
+            self.screen,
+            current_lives=self.player.lives,
+            max_lives=PLAYER_MAX_LIVES,
+            x=hearts_x,
+            y=10,
+            size=heart_size,
+            gap=heart_gap,
+        )
+
+        # --- Columna derecha ---
+        draw_text(self.screen, f"Enemigos: {len(self.enemies)}", 24,
+                  x=SCREEN_WIDTH - 16, y=12, anchor="topright",
                   color=(180, 100, 100))
 
+        # --- Barra inferior de ayuda ---
         draw_text(self.screen,
                   "WASD / Flechas: mover  |  R: reiniciar  |  ESC: salir",
                   20, x=SCREEN_WIDTH // 2, y=SCREEN_HEIGHT - 22,

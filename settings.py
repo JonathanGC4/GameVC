@@ -31,3 +31,9 @@ ENEMY_SPEED_SCALE = 0.05
 PLAYER_MAX_LIVES = 3
 COLOR_HEART_FULL  = (220, 50,  80)   # Rojo para corazón lleno
 COLOR_HEART_EMPTY = (80,  30,  40)   # Rojo oscuro para corazón vacío
+# DIFICULTAD PROGRESIVA
+DIFFICULTY_SPEED_INCREMENT  = 15    # px/s que se suman cada 10 segundos
+DIFFICULTY_SPAWN_DECREMENT  = 0.15  # segundos que se restan al spawn_rate cada 10 s
+DIFFICULTY_INTERVAL         = 10    # cada cuántos segundos sube la dificultad
+DIFFICULTY_MIN_SPAWN_RATE   = 0.4   # spawn_rate mínimo (no puede bajar de esto)
+DIFFICULTY_MAX_ENEMY_SPEED  = 400   # velocidad máxima de los enemigos

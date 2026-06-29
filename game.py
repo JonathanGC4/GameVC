@@ -1,11 +1,12 @@
 # =============================================================================
-# game.py — Clase Game (orquestadora principal)
+# game.py — Clase Game (Iteración 2: enemigos, spawn y colisiones básicas)
 # =============================================================================
 
 import pygame
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, TARGET_FPS,
     COLOR_BACKGROUND, COLOR_ACCENT,
+    ENEMY_BASE_SPEED, ENEMY_SPAWN_RATE, ENEMY_SPEED_SCALE,
 )
 from player import Player
 from enemy  import Enemy
@@ -21,16 +22,20 @@ class Game:
         self.player  = Player()
         self.enemies = []
 
-        self.elapsed_time = 0.0
-        self.score        = 0
-        self.state        = "playing"  # "playing" | "game_over"
+        self.elapsed_time  = 0.0
+        self.score         = 0
+        self.state         = "playing"
+
+        # --- Nuevo en Iteración 2 ---
+        self.spawn_timer   = 0.0   # Acumula tiempo desde el último spawn
+        self.spawn_rate    = ENEMY_SPAWN_RATE  # Segundos entre spawns
+        self.enemy_speed   = ENEMY_BASE_SPEED  # Aumenta con el tiempo
 
     # ------------------------------------------------------------------
     def run(self):
         while self.running:
             dt = self.clock.tick(TARGET_FPS) / 1000.0
-            dt = min(dt, 0.2)  # Evitar saltos si la ventana se congela
-
+            dt = min(dt, 0.2)
             self._handle_events()
             self._update(dt)
             self._draw()
@@ -52,17 +57,41 @@ class Game:
             return
 
         self.player.update(dt)
-
-        for enemy in self.enemies:
-            enemy.update(dt, self.player.center)
+        self._update_enemies(dt)
+        self._check_collisions()
 
         self.elapsed_time += dt
         self.score = int(self.elapsed_time)
 
-        # Hooks para iteraciones futuras:
-        # self._check_collisions()   # Iteración 3
         # self._update_difficulty()  # Iteración 5
         # self._check_game_over()    # Iteración 6
+
+    def _update_enemies(self, dt):
+        """
+        Hace dos cosas:
+        1. Mueve todos los enemigos activos hacia el jugador.
+        2. Genera un nuevo enemigo cada vez que el spawn_timer supera spawn_rate.
+        """
+        # Mover enemigos existentes
+        for enemy in self.enemies:
+            enemy.update(dt, self.player.center)
+
+        # Temporizador de spawn
+        self.spawn_timer += dt
+        if self.spawn_timer >= self.spawn_rate:
+            self.spawn_timer = 0.0
+            self.enemies.append(Enemy.spawn(speed=self.enemy_speed))
+
+    def _check_collisions(self):
+        """
+        Detecta si algún enemigo toca al jugador.
+        Por ahora sólo imprime en consola; las vidas y el game over
+        se implementarán en las Iteraciones 3 y 6.
+        """
+        for enemy in self.enemies:
+            if self.player.rect.colliderect(enemy.rect):
+                # TODO (Iteración 3): self.player.lose_life() + feedback visual
+                print("¡Colisión detectada!")  # Placeholder visible en consola
 
     # ------------------------------------------------------------------
     def _draw(self):
@@ -91,6 +120,11 @@ class Game:
         draw_text(self.screen, f"Vidas: {self.player.lives}", 28,
                   x=SCREEN_WIDTH - 16, y=12, anchor="topright")
 
+        # Contador de enemigos en pantalla (útil para debug)
+        draw_text(self.screen, f"Enemigos: {len(self.enemies)}", 22,
+                  x=SCREEN_WIDTH - 16, y=44, anchor="topright",
+                  color=(180, 100, 100))
+
         draw_text(self.screen,
                   "WASD / Flechas: mover  |  R: reiniciar  |  ESC: salir",
                   20, x=SCREEN_WIDTH // 2, y=SCREEN_HEIGHT - 22,
@@ -118,3 +152,5 @@ class Game:
         self.elapsed_time = 0.0
         self.score        = 0
         self.state        = "playing"
+        self.spawn_timer  = 0.0
+        self.enemy_speed  = ENEMY_BASE_SPEED

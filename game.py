@@ -1,16 +1,20 @@
 # =============================================================================
-# game.py — Clase Game (Iteración 2: enemigos, spawn y colisiones básicas)
+# game.py — Iteración 3: colisiones completas con feedback visual
 # =============================================================================
 
 import pygame
 from settings import (
     SCREEN_WIDTH, SCREEN_HEIGHT, TARGET_FPS,
     COLOR_BACKGROUND, COLOR_ACCENT,
-    ENEMY_BASE_SPEED, ENEMY_SPAWN_RATE, ENEMY_SPEED_SCALE,
+    ENEMY_BASE_SPEED, ENEMY_SPAWN_RATE,
 )
 from player import Player
 from enemy  import Enemy
 from utils  import draw_text
+
+
+# Duración del flash rojo en pantalla al recibir daño (segundos)
+HIT_FLASH_DURATION = 0.2
 
 
 class Game:
@@ -22,14 +26,16 @@ class Game:
         self.player  = Player()
         self.enemies = []
 
-        self.elapsed_time  = 0.0
-        self.score         = 0
-        self.state         = "playing"
+        self.elapsed_time = 0.0
+        self.score        = 0
+        self.state        = "playing"
 
-        # --- Nuevo en Iteración 2 ---
-        self.spawn_timer   = 0.0   # Acumula tiempo desde el último spawn
-        self.spawn_rate    = ENEMY_SPAWN_RATE  # Segundos entre spawns
-        self.enemy_speed   = ENEMY_BASE_SPEED  # Aumenta con el tiempo
+        self.spawn_timer  = 0.0
+        self.spawn_rate   = ENEMY_SPAWN_RATE
+        self.enemy_speed  = ENEMY_BASE_SPEED
+
+        # --- Nuevo en Iteración 3 ---
+        self.hit_flash_timer = 0.0   # Tiempo restante del flash rojo
 
     # ------------------------------------------------------------------
     def run(self):
@@ -60,23 +66,20 @@ class Game:
         self._update_enemies(dt)
         self._check_collisions()
 
+        # Descontar el flash de daño
+        if self.hit_flash_timer > 0:
+            self.hit_flash_timer -= dt
+
         self.elapsed_time += dt
         self.score = int(self.elapsed_time)
 
         # self._update_difficulty()  # Iteración 5
-        # self._check_game_over()    # Iteración 6
+        self._check_game_over()       # Ya podemos activarlo en Iteración 3
 
     def _update_enemies(self, dt):
-        """
-        Hace dos cosas:
-        1. Mueve todos los enemigos activos hacia el jugador.
-        2. Genera un nuevo enemigo cada vez que el spawn_timer supera spawn_rate.
-        """
-        # Mover enemigos existentes
         for enemy in self.enemies:
             enemy.update(dt, self.player.center)
 
-        # Temporizador de spawn
         self.spawn_timer += dt
         if self.spawn_timer >= self.spawn_rate:
             self.spawn_timer = 0.0
@@ -84,14 +87,20 @@ class Game:
 
     def _check_collisions(self):
         """
-        Detecta si algún enemigo toca al jugador.
-        Por ahora sólo imprime en consola; las vidas y el game over
-        se implementarán en las Iteraciones 3 y 6.
+        Recorre los enemigos y aplica daño si tocan al jugador.
+        El jugador tiene invencibilidad temporal (gestionada en Player),
+        así que take_hit() internamente ignora golpes repetidos.
         """
         for enemy in self.enemies:
             if self.player.rect.colliderect(enemy.rect):
-                # TODO (Iteración 3): self.player.lose_life() + feedback visual
-                print("¡Colisión detectada!")  # Placeholder visible en consola
+                self.player.take_hit()
+                self.hit_flash_timer = HIT_FLASH_DURATION
+                break   # Un solo golpe por frame es suficiente
+
+    def _check_game_over(self):
+        """Cambia el estado a game_over cuando el jugador se queda sin vidas."""
+        if not self.player.is_alive:
+            self.state = "game_over"
 
     # ------------------------------------------------------------------
     def _draw(self):
@@ -101,12 +110,41 @@ class Game:
             enemy.draw(self.screen)
 
         self.player.draw(self.screen)
+
+        # Flash rojo en los bordes al recibir daño
+        if self.hit_flash_timer > 0:
+            self._draw_hit_flash()
+
         self._draw_hud()
 
         if self.state == "game_over":
             self._draw_game_over()
 
         pygame.display.flip()
+
+    def _draw_hit_flash(self):
+        """
+        Dibuja un viñeteado rojo semitransparente en los bordes de la pantalla.
+        La opacidad es proporcional al tiempo restante del flash para que
+        desaparezca suavemente en lugar de cortarse de golpe.
+        """
+        # Opacidad entre 0 y 160 según el tiempo restante
+        alpha = int((self.hit_flash_timer / HIT_FLASH_DURATION) * 160)
+
+        flash = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+
+        # Dibujar sólo los bordes (cuatro rectángulos finos), no toda la pantalla
+        border = 40
+        rects = [
+            pygame.Rect(0, 0, SCREEN_WIDTH, border),               # Arriba
+            pygame.Rect(0, SCREEN_HEIGHT - border, SCREEN_WIDTH, border),  # Abajo
+            pygame.Rect(0, 0, border, SCREEN_HEIGHT),              # Izquierda
+            pygame.Rect(SCREEN_WIDTH - border, 0, border, SCREEN_HEIGHT),  # Derecha
+        ]
+        for rect in rects:
+            pygame.draw.rect(flash, (220, 30, 30, alpha), rect)
+
+        self.screen.blit(flash, (0, 0))
 
     def _draw_hud(self):
         draw_text(self.screen, f"Puntos: {self.score}", 28,
@@ -120,7 +158,6 @@ class Game:
         draw_text(self.screen, f"Vidas: {self.player.lives}", 28,
                   x=SCREEN_WIDTH - 16, y=12, anchor="topright")
 
-        # Contador de enemigos en pantalla (útil para debug)
         draw_text(self.screen, f"Enemigos: {len(self.enemies)}", 22,
                   x=SCREEN_WIDTH - 16, y=44, anchor="topright",
                   color=(180, 100, 100))
@@ -149,8 +186,9 @@ class Game:
     def reset(self):
         self.player.reset()
         self.enemies.clear()
-        self.elapsed_time = 0.0
-        self.score        = 0
-        self.state        = "playing"
-        self.spawn_timer  = 0.0
-        self.enemy_speed  = ENEMY_BASE_SPEED
+        self.elapsed_time    = 0.0
+        self.score           = 0
+        self.state           = "playing"
+        self.spawn_timer     = 0.0
+        self.enemy_speed     = ENEMY_BASE_SPEED
+        self.hit_flash_timer = 0.0
